@@ -20,7 +20,7 @@ export const performOCR = async (base64Image: string, mimeType: string): Promise
             },
           },
           {
-            text: "Atue como um sistema de OCR de alta precisão para cartórios brasileiros. Transcreva TODO o texto contido nesta imagem. Mantenha a formatação original onde possível. Não adicione comentários, apenas o texto transcrito.",
+            text: "Atue como um sistema de OCR profissional para cartórios. Transcreva TODO o texto contido nesta imagem com exatidão. Se houver tabelas, tente manter a estrutura. Se houver carimbos, selos ou assinaturas ilegíveis, indique entre colchetes ex: [Assinatura Ilegível], [Selo do Cartório]. Não faça resumos, quero a transcrição completa.",
           },
         ],
       },
@@ -41,31 +41,37 @@ export const analyzeLegalText = async (text: string): Promise<ExtractedData> => 
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-pro',
-      contents: `Analise o seguinte texto jurídico extraído de um documento cartorário:
+      contents: `Você é um Tabelião AI especializado em Direito Notarial e Registral Brasileiro.
+      Analise o seguinte texto extraído de um documento:
       
-      "${text.substring(0, 30000)}..." 
+      "${text.substring(0, 40000)}..." 
       
-      (Texto truncado se muito longo).
+      Objetivo: Identificar a natureza do ato, as partes, riscos jurídicos e conformidade com o Código Civil e normas da Corregedoria (CNJ).
       
-      Gere um resumo estruturado JSON.
+      Gere um JSON seguindo estritamente este schema:
       `,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            rawText: { type: Type.STRING, description: "O texto original fornecido (ou um trecho dele)." },
-            summary: { type: Type.STRING, description: "Um resumo jurídico executivo do documento." },
-            documentType: { type: Type.STRING, description: "Tipo do documento (ex: Escritura, Procuração, Certidão)." },
+            rawText: { type: Type.STRING, description: "O texto original analisado." },
+            summary: { type: Type.STRING, description: "Resumo técnico-jurídico do ato notarial." },
+            documentType: { type: Type.STRING, description: "Classificação do documento (ex: Escritura Pública de Compra e Venda, Procuração Ad Judicia, Certidão de Inteiro Teor)." },
             parties: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING },
-              description: "Lista das partes envolvidas (nomes completos)." 
+              description: "Qualificação completa das partes (Outorgante, Outorgado, Comprador, Vendedor, Tabelião)." 
             },
             dates: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING },
-              description: "Datas relevantes encontradas no documento."
+              description: "Datas de assinatura, expedição ou validade encontradas."
+            },
+            missingRequirements: {
+              type: Type.ARRAY,
+              items: { type: Type.STRING },
+              description: "Lista de requisitos formais ou documentos acessórios que aparentam estar ausentes ou não citados (ex: Certidão Negativa de Débitos, Recolhimento de ITBI, Reconhecimento de Firma, DOI)."
             },
             riskFactors: {
               type: Type.ARRAY,
@@ -74,10 +80,10 @@ export const analyzeLegalText = async (text: string): Promise<ExtractedData> => 
                 properties: {
                   severity: { type: Type.STRING, enum: ["LOW", "MEDIUM", "HIGH"] },
                   description: { type: Type.STRING },
-                  location: { type: Type.STRING, description: "Citação do trecho ou cláusula relacionada." }
+                  location: { type: Type.STRING, description: "Cláusula ou trecho específico." }
                 }
               },
-              description: "Fatores de risco jurídico, cláusulas abusivas ou atenção especial."
+              description: "Cláusulas abusivas, erros materiais, vícios de consentimento aparentes ou falta de clareza."
             }
           }
         }
@@ -88,7 +94,7 @@ export const analyzeLegalText = async (text: string): Promise<ExtractedData> => 
     if (!jsonText) throw new Error("Resposta vazia da análise.");
     
     const data = JSON.parse(jsonText) as ExtractedData;
-    // Ensure rawText is the full text passed in, as the model might truncate it in output
+    // Ensure rawText is the full text passed in
     data.rawText = text; 
     return data;
 
@@ -106,11 +112,15 @@ export const performDeepResearch = async (query: string, context: string): Promi
   try {
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
-      contents: `Contexto do documento: "${context.substring(0, 2000)}..."
+      contents: `Você é um assistente de pesquisa jurídica para cartórios.
       
-      Pergunta de pesquisa do usuário: "${query}"
+      Contexto do Documento Analisado:
+      "${context.substring(0, 2000)}..."
       
-      Realize uma pesquisa profunda para responder a esta pergunta no contexto jurídico brasileiro. Cite fontes.`,
+      Pergunta do Usuário: "${query}"
+      
+      Realize uma pesquisa para responder com base na Legislação Brasileira (Código Civil, Leis de Registros Públicos) e Jurisprudência recente (STJ/STF).
+      Forneça uma resposta fundamentada.`,
       config: {
         tools: [{ googleSearch: {} }],
       },

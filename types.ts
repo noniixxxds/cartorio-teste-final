@@ -14,6 +14,7 @@ export interface ExtractedData {
   parties: string[];
   dates: string[];
   riskFactors: RiskFactor[];
+  missingRequirements: string[];
 }
 
 export interface RiskFactor {
