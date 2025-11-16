@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState } from 'react';
 import { UploadArea } from './UploadArea';
-import { DocumentContext, AnalysisStatus, ResearchResult } from '../types';
+import { DocumentContext, AnalysisStatus } from '../types';
 import { performOCR, analyzeLegalText, performDeepResearch } from '../services/geminiService';
-import { Loader2, AlertTriangle, CheckCircle, Search, FileText, Bot, ChevronRight, ExternalLink, ZoomIn, BrainCircuit, ShieldAlert } from 'lucide-react';
+import { Loader2, AlertTriangle, CheckCircle, Search, FileText, Bot, ExternalLink, ShieldAlert, BrainCircuit, FileCheck, AlertOctagon } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 export const Workspace: React.FC = () => {
@@ -39,13 +39,13 @@ export const Workspace: React.FC = () => {
       });
 
       setStatus(AnalysisStatus.PROCESSING_OCR);
-      setStatusMessage("Digitalizando e transcrevendo texto (OCR Gemini 2.5)...");
+      setStatusMessage("Realizando OCR de Alta Precisão (Gemini 2.5)...");
 
       // 1. OCR
       const extractedText = await performOCR(base64Data, file.type);
       
       setStatus(AnalysisStatus.PROCESSING_ANALYSIS);
-      setStatusMessage("Auditando conformidade legal e identificando partes...");
+      setStatusMessage("Analisando Requisitos Legais (Lei 6.015/73 e CC/2002)...");
 
       // 2. Analysis
       const analysis = await analyzeLegalText(extractedText);
@@ -65,7 +65,7 @@ export const Workspace: React.FC = () => {
     if (!docContext?.extractedData || !researchQuery.trim()) return;
 
     setStatus(AnalysisStatus.PROCESSING_RESEARCH);
-    setStatusMessage("Consultando bases jurídicas, leis e jurisprudência...");
+    setStatusMessage("Consultando Jurisprudência e Legislação...");
 
     try {
       const result = await performDeepResearch(researchQuery, docContext.extractedData.rawText);
@@ -106,7 +106,7 @@ export const Workspace: React.FC = () => {
             <div className="px-4 py-3 bg-white border-b border-slate-200 font-semibold text-slate-700 text-sm flex justify-between items-center shadow-sm z-10">
                 <div className="flex items-center gap-2">
                   <FileText className="w-4 h-4 text-blue-600" />
-                  <span>Transcrição OCR (Gemini Flash)</span>
+                  <span>Transcrição Integral (OCR)</span>
                 </div>
                 <span className="text-xs px-2 py-1 bg-slate-100 rounded text-slate-500">Editável</span>
             </div>
@@ -155,21 +155,22 @@ export const Workspace: React.FC = () => {
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-blue-100">
                         <div className="flex items-start justify-between mb-2">
                            <div>
-                              <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Tipo de Documento</p>
+                              <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Natureza do Ato</p>
                               <h2 className="text-xl font-bold text-slate-900 leading-tight">{docContext.extractedData.documentType || "Em análise..."}</h2>
                            </div>
                            {docContext.extractedData.riskFactors.some(r => r.severity === 'HIGH') && (
                              <span className="px-3 py-1 bg-red-100 text-red-700 text-xs font-bold rounded-full border border-red-200 flex items-center gap-1">
-                               <ShieldAlert className="w-3 h-3" /> Atenção Requerida
+                               <ShieldAlert className="w-3 h-3" /> Risco Elevado
                              </span>
                            )}
                         </div>
                         
                         <div className="mt-4 pt-4 border-t border-slate-100">
-                            <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Partes Envolvidas</p>
+                            <p className="text-xs font-semibold text-slate-400 uppercase mb-2">Partes Qualificadas</p>
                             <div className="flex flex-wrap gap-2">
                                 {docContext.extractedData.parties.map((party, idx) => (
-                                    <span key={idx} className="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm font-medium rounded-md border border-slate-200">
+                                    <span key={idx} className="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm font-medium rounded-md border border-slate-200 flex items-center gap-2">
+                                        <div className="w-2 h-2 bg-blue-400 rounded-full"></div>
                                         {party}
                                     </span>
                                 ))}
@@ -178,29 +179,41 @@ export const Workspace: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Missing Requirements Alert */}
-                    {docContext.extractedData.missingRequirements && docContext.extractedData.missingRequirements.length > 0 && (
-                      <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
-                        <h3 className="text-sm font-bold text-amber-800 uppercase tracking-wide mb-3 flex items-center gap-2">
-                            <AlertTriangle className="w-4 h-4" /> Pendências ou Requisitos Ausentes
+                    {/* Missing Requirements / Compliance Check */}
+                    <div className={`rounded-xl p-5 border ${
+                         docContext.extractedData.missingRequirements?.length > 0 
+                         ? 'bg-amber-50 border-amber-200' 
+                         : 'bg-green-50 border-green-200'
+                    }`}>
+                        <h3 className={`text-sm font-bold uppercase tracking-wide mb-3 flex items-center gap-2 ${
+                            docContext.extractedData.missingRequirements?.length > 0 ? 'text-amber-800' : 'text-green-800'
+                        }`}>
+                            {docContext.extractedData.missingRequirements?.length > 0 
+                                ? <><AlertOctagon className="w-4 h-4" /> Requisitos Pendentes / Ausentes</>
+                                : <><FileCheck className="w-4 h-4" /> Conformidade Formal</>
+                            }
                         </h3>
-                        <ul className="space-y-2">
-                          {docContext.extractedData.missingRequirements.map((req, i) => (
-                            <li key={i} className="flex items-start gap-2 text-sm text-amber-900">
-                              <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                              {req}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
+                        
+                        {docContext.extractedData.missingRequirements?.length > 0 ? (
+                             <ul className="space-y-2">
+                             {docContext.extractedData.missingRequirements.map((req, i) => (
+                               <li key={i} className="flex items-start gap-2 text-sm text-amber-900 bg-amber-100/50 p-2 rounded">
+                                 <span className="mt-1.5 w-1.5 h-1.5 rounded-full bg-amber-500 flex-shrink-0" />
+                                 {req}
+                               </li>
+                             ))}
+                           </ul>
+                        ) : (
+                            <p className="text-sm text-green-800">O documento aparenta cumprir os requisitos formais básicos para sua natureza.</p>
+                        )}
+                    </div>
 
                     {/* Summary */}
                     <div>
                         <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2 px-1">
-                            <FileText className="w-4 h-4 text-blue-600" /> Resumo do Ato
+                            <FileText className="w-4 h-4 text-blue-600" /> Resumo Jurídico
                         </h3>
-                        <div className="text-slate-700 leading-relaxed text-sm bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+                        <div className="text-slate-700 leading-relaxed text-sm bg-white p-5 rounded-xl shadow-sm border border-slate-200 text-justify">
                             {docContext.extractedData.summary}
                         </div>
                     </div>
@@ -208,7 +221,7 @@ export const Workspace: React.FC = () => {
                     {/* Risks Analysis */}
                     <div>
                          <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wide mb-3 flex items-center gap-2 px-1">
-                            <ShieldAlert className="w-4 h-4 text-blue-600" /> Análise de Risco & Cláusulas
+                            <ShieldAlert className="w-4 h-4 text-blue-600" /> Análise de Risco & Vícios
                         </h3>
                         <div className="space-y-3">
                             {docContext.extractedData.riskFactors.length === 0 && (
@@ -218,10 +231,10 @@ export const Workspace: React.FC = () => {
                                 </div>
                             )}
                             {docContext.extractedData.riskFactors.map((risk, i) => (
-                                <div key={i} className={`p-4 rounded-xl border shadow-sm transition-all hover:shadow-md ${
-                                    risk.severity === 'HIGH' ? 'border-red-200 bg-white' :
-                                    risk.severity === 'MEDIUM' ? 'border-amber-200 bg-white' :
-                                    'border-blue-200 bg-white'
+                                <div key={i} className={`p-4 rounded-xl border-l-4 shadow-sm transition-all hover:shadow-md ${
+                                    risk.severity === 'HIGH' ? 'border-red-500 bg-white' :
+                                    risk.severity === 'MEDIUM' ? 'border-amber-500 bg-white' :
+                                    'border-blue-400 bg-white'
                                 }`}>
                                     <div className="flex justify-between items-start mb-2">
                                         <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase tracking-wider ${
@@ -231,8 +244,8 @@ export const Workspace: React.FC = () => {
                                         }`}>{risk.severity === 'HIGH' ? 'Risco Alto' : risk.severity === 'MEDIUM' ? 'Atenção' : 'Nota'}</span>
                                     </div>
                                     <p className="text-sm text-slate-800 font-semibold mb-1">{risk.description}</p>
-                                    <div className="text-xs text-slate-500 font-mono bg-slate-50 p-2 rounded border border-slate-100 mt-2 truncate">
-                                      Ref: "{risk.location}"
+                                    <div className="text-xs text-slate-500 font-mono bg-slate-50 p-2 rounded border border-slate-100 mt-2 truncate flex items-center gap-2">
+                                      <Search className="w-3 h-3" /> Localização: "{risk.location}"
                                     </div>
                                 </div>
                             ))}
@@ -244,13 +257,13 @@ export const Workspace: React.FC = () => {
             {activeTab === 'RESEARCH' && (
                 <div className="flex flex-col h-full">
                     <div className="mb-6 bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-                        <label className="block text-sm font-bold text-slate-700 mb-3">Pesquisa Jurídica Inteligente (Grounding)</label>
+                        <label className="block text-sm font-bold text-slate-700 mb-3">Pesquisa Jurídica (Doutrina & Jurisprudência)</label>
                         <div className="flex gap-2">
                             <input 
                                 type="text" 
                                 value={researchQuery}
                                 onChange={(e) => setResearchQuery(e.target.value)}
-                                placeholder="Ex: É válida a cláusula de retrovenda neste contrato?"
+                                placeholder="Ex: Qual o prazo decadencial para anular esta venda de ascendente para descendente?"
                                 className="flex-1 border border-slate-300 rounded-lg px-4 py-3 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                                 onKeyDown={(e) => e.key === 'Enter' && handleResearch()}
                             />
@@ -269,8 +282,8 @@ export const Workspace: React.FC = () => {
                         {(!docContext.research || docContext.research.length === 0) && (
                             <div className="text-center py-16 text-slate-400 bg-slate-50 rounded-xl border border-dashed border-slate-300">
                                 <Bot className="w-12 h-12 mx-auto mb-4 opacity-30" />
-                                <h4 className="text-slate-600 font-medium mb-1">Assistente Jurídico Pronto</h4>
-                                <p className="text-sm max-w-md mx-auto">Utilize a barra acima para investigar a validade jurídica, encontrar precedentes ou validar requisitos legais específicos deste documento.</p>
+                                <h4 className="text-slate-600 font-medium mb-1">Assistente de Pesquisa Notarial</h4>
+                                <p className="text-sm max-w-md mx-auto">Utilize a barra acima para verificar a validade jurídica, buscar acórdãos do STJ ou validar requisitos específicos.</p>
                             </div>
                         )}
 
@@ -285,7 +298,7 @@ export const Workspace: React.FC = () => {
                                 </div>
                                 {res.sources.length > 0 && (
                                     <div className="mt-4 pt-4 border-t border-slate-100">
-                                        <p className="text-xs font-bold text-slate-400 uppercase mb-3 tracking-wider">Fontes & Referências</p>
+                                        <p className="text-xs font-bold text-slate-400 uppercase mb-3 tracking-wider">Fontes Citadas</p>
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                                             {res.sources.map((src, sIdx) => (
                                                 <a key={sIdx} href={src.uri} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-2 rounded transition-colors truncate border border-blue-100">

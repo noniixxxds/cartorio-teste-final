@@ -20,7 +20,7 @@ export const performOCR = async (base64Image: string, mimeType: string): Promise
             },
           },
           {
-            text: "Atue como um sistema de OCR profissional para cartórios. Transcreva TODO o texto contido nesta imagem com exatidão. Se houver tabelas, tente manter a estrutura. Se houver carimbos, selos ou assinaturas ilegíveis, indique entre colchetes ex: [Assinatura Ilegível], [Selo do Cartório]. Não faça resumos, quero a transcrição completa.",
+            text: "Atue como um sistema de OCR profissional para cartórios. Transcreva TODO o texto contido nesta imagem com exatidão, mantendo a formatação original. Se houver tabelas, mantenha a estrutura. Se houver carimbos, selos ou assinaturas ilegíveis, indique entre colchetes ex: [Assinatura Ilegível], [Selo Digital: XYZ]. Não faça resumos, transcreva ipsis litteris.",
           },
         ],
       },
@@ -35,43 +35,51 @@ export const performOCR = async (base64Image: string, mimeType: string): Promise
 
 /**
  * Step 2: Analyze Text using Gemini Pro (Reasoning)
- * Extracts structured entities and risks.
+ * Extracts structured entities and risks based on Brazilian Law.
  */
 export const analyzeLegalText = async (text: string): Promise<ExtractedData> => {
   try {
+    // Using Gemini 2.5 Pro for deep reasoning capability
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-pro',
-      contents: `Você é um Tabelião AI especializado em Direito Notarial e Registral Brasileiro.
-      Analise o seguinte texto extraído de um documento:
+      contents: `Você é um Tabelião Substituto AI especializado em Direito Notarial e Registral Brasileiro (Lei 6.015/73, Lei 8.935/94, Código Civil 2002 e Provimentos do CNJ).
       
-      "${text.substring(0, 40000)}..." 
+      Analise o seguinte teor de documento extraído via OCR:
       
-      Objetivo: Identificar a natureza do ato, as partes, riscos jurídicos e conformidade com o Código Civil e normas da Corregedoria (CNJ).
+      """
+      ${text.substring(0, 45000)}
+      """ 
       
-      Gere um JSON seguindo estritamente este schema:
-      `,
+      TAREFA:
+      1. Identifique a Natureza do Ato (ex: Escritura de Compra e Venda, Procuração, Certidão de Nascimento).
+      2. Qualifique as Partes (Nomes, CPFs/CNPJs se visíveis).
+      3. ANÁLISE DE CONFORMIDADE (CRÍTICO): Verifique se o documento atende aos requisitos formais.
+         - Ex: Uma escritura de imóvel cita o ITBI? Cita as CNDs? Tem outorga uxória se casado for? Tem menção ao selo digital?
+      4. ANÁLISE DE RISCO: Identifique cláusulas abusivas, erros materiais (datas impossíveis, nomes divergentes) ou riscos de nulidade.
+      
+      Retorne APENAS JSON seguindo este schema:`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
           type: Type.OBJECT,
           properties: {
             rawText: { type: Type.STRING, description: "O texto original analisado." },
-            summary: { type: Type.STRING, description: "Resumo técnico-jurídico do ato notarial." },
-            documentType: { type: Type.STRING, description: "Classificação do documento (ex: Escritura Pública de Compra e Venda, Procuração Ad Judicia, Certidão de Inteiro Teor)." },
+            summary: { type: Type.STRING, description: "Resumo técnico-jurídico formal do ato." },
+            documentType: { type: Type.STRING, description: "Classificação jurídica precisa do documento." },
             parties: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING },
-              description: "Qualificação completa das partes (Outorgante, Outorgado, Comprador, Vendedor, Tabelião)." 
+              description: "Lista das partes qualificadas (Ex: 'Fulano de Tal (Outorgante)')." 
             },
             dates: { 
               type: Type.ARRAY, 
               items: { type: Type.STRING },
-              description: "Datas de assinatura, expedição ou validade encontradas."
+              description: "Datas relevantes encontradas (assinatura, validade, expedição)."
             },
             missingRequirements: {
               type: Type.ARRAY,
               items: { type: Type.STRING },
-              description: "Lista de requisitos formais ou documentos acessórios que aparentam estar ausentes ou não citados (ex: Certidão Negativa de Débitos, Recolhimento de ITBI, Reconhecimento de Firma, DOI)."
+              description: "Lista de requisitos legais OBRIGATÓRIOS que parecem estar ausentes ou não mencionados (ex: 'Ausência de menção ao recolhimento de ITBI', 'Falta reconhecimento de firma', 'Não consta selo de fiscalização')."
             },
             riskFactors: {
               type: Type.ARRAY,
@@ -79,11 +87,11 @@ export const analyzeLegalText = async (text: string): Promise<ExtractedData> => 
                 type: Type.OBJECT,
                 properties: {
                   severity: { type: Type.STRING, enum: ["LOW", "MEDIUM", "HIGH"] },
-                  description: { type: Type.STRING },
-                  location: { type: Type.STRING, description: "Cláusula ou trecho específico." }
+                  description: { type: Type.STRING, description: "Descrição detalhada do risco jurídico." },
+                  location: { type: Type.STRING, description: "Trecho ou cláusula onde o risco reside." }
                 }
               },
-              description: "Cláusulas abusivas, erros materiais, vícios de consentimento aparentes ou falta de clareza."
+              description: "Fatores de risco, vícios de vontade ou erros materiais."
             }
           }
         }
@@ -94,7 +102,6 @@ export const analyzeLegalText = async (text: string): Promise<ExtractedData> => 
     if (!jsonText) throw new Error("Resposta vazia da análise.");
     
     const data = JSON.parse(jsonText) as ExtractedData;
-    // Ensure rawText is the full text passed in
     data.rawText = text; 
     return data;
 
@@ -111,16 +118,20 @@ export const analyzeLegalText = async (text: string): Promise<ExtractedData> => 
 export const performDeepResearch = async (query: string, context: string): Promise<ResearchResult> => {
   try {
     const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `Você é um assistente de pesquisa jurídica para cartórios.
+      model: 'gemini-2.5-flash', // Using Flash for faster search integration
+      contents: `Você é um Jurista Pesquisador Sênior.
       
-      Contexto do Documento Analisado:
-      "${context.substring(0, 2000)}..."
+      Contexto do Documento:
+      "${context.substring(0, 1500)}..."
       
-      Pergunta do Usuário: "${query}"
+      Dúvida Jurídica: "${query}"
       
-      Realize uma pesquisa para responder com base na Legislação Brasileira (Código Civil, Leis de Registros Públicos) e Jurisprudência recente (STJ/STF).
-      Forneça uma resposta fundamentada.`,
+      Realize uma pesquisa profunda. Busque por:
+      1. Artigos de Lei (Código Civil, CPC, Leis Especiais).
+      2. Jurisprudência consolidada (STJ, STF) ou Enunciados de Câmaras Registrais.
+      3. Provimentos recentes do CNJ.
+      
+      Sua resposta deve ser técnica, fundamentada e direta.`,
       config: {
         tools: [{ googleSearch: {} }],
       },
