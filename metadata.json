@@ -1,0 +1,5 @@
+{
+  "name": "NotárioAI",
+  "description": "Sistema avançado de OCR e análise jurídica para cartórios utilizando Gemini 2.5 com capacidade de pesquisa profunda.",
+  "requestFramePermissions": []
+}
